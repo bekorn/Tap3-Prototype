@@ -44,8 +44,6 @@ public readonly struct ClusterSolver
 
         public bool IsRoot => parentGrid.x == -1;
 
-        public bool Equals(Node other) => grid.Equals(other.grid) && parentGrid.Equals(other.parentGrid);
-
         public override string ToString() => $"({grid.x},{grid.y})>({(IsRoot ? "---" : $"{parentGrid.x},{parentGrid.y}")})";
     }
 
@@ -62,6 +60,7 @@ public readonly struct ClusterSolver
 
     void PrintNodes(Array2D<Cell> cells, int _x, int _y)
     {
+        return;
         var nodesStr = new StringBuilder($"step({_x}, {_y})\n");
         for (var x = size.x - 1; x >= 0; x--)
         {
@@ -207,6 +206,7 @@ public class Level : MonoBehaviour
     [NonSerialized] public (int2 grid, bool isIn) MousePrevious;
     [NonSerialized] public (int2 grid, bool isIn) MouseCurrent;
     [NonSerialized] public bool IsMouseChanged;
+    [NonSerialized] public int2 MouseDownGrid;
 
     void Update()
     {
@@ -224,9 +224,22 @@ public class Level : MonoBehaviour
                 Transforms[MouseCurrent.grid].localScale = float3(1.2f);
         }
 
-        if (Input.GetMouseButtonUp(0) && MouseCurrent.isIn)
+        if (Input.GetMouseButtonDown(0) && MouseCurrent.isIn)
+            MouseDownGrid = MouseCurrent.grid;
+
+        if (Input.GetMouseButtonUp(0) && MouseCurrent.grid.Equals(MouseDownGrid) && Cells[MouseCurrent.grid].Type != ItemType.Empty)
         {
-            Debug.Log($"Clicked on grid: {MouseCurrent.grid} {Cells[MouseCurrent.grid]}");
+            Debug.Log($"MouseAction on grid: {MouseCurrent.grid} {Cells[MouseCurrent.grid]}");
+
+            var clusterGrid = clusterSolver.Clusters[MouseCurrent.grid].group;
+            for (var i = 0; i < clusterSolver.Clusters.Length; i++)
+                if (clusterSolver.Clusters[i].group.Equals(clusterGrid))
+                {
+                    Transforms[i].gameObject.SetActive(false);
+                    Cells[i].Type = ItemType.Empty;
+                }
+            
+            UpdateGroups();
         }
 
         MousePrevious = MouseCurrent;
@@ -238,9 +251,12 @@ public class Level : MonoBehaviour
         
         for (var i = 0; i < Icons.Length; i++)
         {
-            var clusterType = clusterSolver.Clusters[i].size / 3;
-            if (clusterType != 0)
-                Icons[i].sprite = powerUpIcons[clusterType - 1];
+            var type = clusterSolver.Clusters[i].size / 3;
+            Icons[i].sprite = type switch
+            {
+                0 => levelConfig.icons[Cells[i].SubType],
+                _ => powerUpIcons[type - 1],
+            };
         }
     }
 }
