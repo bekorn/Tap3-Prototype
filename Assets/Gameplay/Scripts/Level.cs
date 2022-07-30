@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
+using Gameplay.Scripts.DataStructures;
 using UnityEngine;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
@@ -9,12 +11,6 @@ using Random = Unity.Mathematics.Random;
 
 namespace Gameplay.Scripts
 {
-public static class MultidimensionalArrayExtensions
-{
-    public static T Get<T>(this T[,] arr, int2 idx) => arr[idx.x, idx.y];
-    public static ref T GetRef<T>(this T[,] arr, int2 idx) where T : struct => ref arr[idx.x, idx.y];
-}
-
 public enum ItemType : int { Empty, Block, ExplosO, ExplosI }
 
 public struct Cell
@@ -55,17 +51,17 @@ readonly struct ClusterSolver
     }
 
     readonly int2 size;
-    readonly Node[,] nodes;
-    readonly Cell[,] cells;
+    readonly Array2D<Node> nodes;
+    readonly Array2D<int> groups;
 
     public ClusterSolver(int2 boardSize)
     {
         size = boardSize;
-        nodes = new Node[size.x, size.y];
-        cells = new Cell[size.x, size.y];
+        nodes = new Array2D<Node>(size);
+        groups = new Array2D<int>(size);
     }
 
-    void PrintNodes(int _x, int _y)
+    void PrintNodes(Array2D<Cell> cells, int _x, int _y)
     {
         var nodesStr = new StringBuilder($"step({_x}, {_y})\n");
         for (var x = size.x - 1; x >= 0; x--)
@@ -83,55 +79,50 @@ readonly struct ClusterSolver
     int2 GetRoot(Node node)
     {
         while (!node.IsRoot)
-            node = nodes.Get(node.parentGrid);
+            node = nodes[node.parentGrid.x, node.parentGrid.y];
         return node.grid;
     }
 
     void AddChild(int2 parent, int2 node)
     {
         if (!node.Equals(parent))
-            nodes.GetRef(node).parentGrid = parent;
+            nodes[node.x, node.y].parentGrid = parent;
     }
 
-    public void Solve(Cell[,] levelCells)
+    public void Solve(Array2D<Cell> cells)
     {
         // clear state
         for (var x = 0; x < size.x; x++)
         for (var y = 0; y < size.y; y++)
         {
             nodes[x, y] = new(int2(x, y), int2(-1));
-            cells[x, y] = new(ItemType.Empty, default);
         }
 
         // bottom-left corner
-        cells[0, 0] = levelCells[0, 0];
-        PrintNodes(0, 0);
+        PrintNodes(cells, 0, 0);
 
         // bottom row
         for (var x = 1; x < size.x; x++)
         {
-            cells[x, 0] = levelCells[x, 0];
             if (cells[x, 0] == cells[x - 1, 0]) AddChild(int2(x, 0), GetRoot(nodes[x - 1, 0]));
         }
-        PrintNodes(1, 0);
+        PrintNodes(cells, 1, 0);
 
         // left column
         for (var y = 1; y < size.y; y++)
         {
-            cells[0, y] = levelCells[0, y];
             if (cells[0, y] == cells[0, y - 1]) AddChild(int2(0, y), GetRoot(nodes[0, y - 1]));
         }
-        PrintNodes(0, 1);
+        PrintNodes(cells, 0, 1);
 
         // the rest
         for (var x = 1; x < size.x; x++)
         for (var y = 1; y < size.y; y++)
         {
-            cells[x, y] = levelCells[x, y];
             if (cells[x, y] == cells[x - 1, y]) AddChild(int2(x, y), GetRoot(nodes[x - 1, y]));
             if (cells[x, y] == cells[x, y - 1]) AddChild(int2(x, y), GetRoot(nodes[x, y - 1]));
 
-            PrintNodes(x, y);
+            PrintNodes(cells, x, y);
         }
 
         var clusters = new int[size.x, size.y];
@@ -149,8 +140,7 @@ public class Level : MonoBehaviour
 
     Transform t;
     Random random = new(1235);
-    [NonSerialized] public Cell[,] cells;
-    [NonSerialized] public int[,] groups;
+    public Array2D<Cell> cells;
 
     // Space transforms
     public float2 World2Local(float2 worldPos) => float3(t.position).xy - worldPos;
@@ -166,8 +156,7 @@ public class Level : MonoBehaviour
 
     void Start()
     {
-        cells = new Cell[levelConfig.size.x, levelConfig.size.y];
-        groups = new int[levelConfig.size.x, levelConfig.size.y];
+        cells = new Array2D<Cell>(levelConfig.size);
 
         float3 pos = t.position;
 

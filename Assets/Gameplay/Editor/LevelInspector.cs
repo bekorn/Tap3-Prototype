@@ -39,9 +39,9 @@ public class LevelInspector : UnityEditor.Editor
                 break;
 
             case DebugLayer.Cells:
-                if (level.cells != null)
-                    for (var x = 0; x < level.cells.GetLength(0); x++)
-                    for (var y = 0; y < level.cells.GetLength(1); y++)
+                if (level.cells.array != null)
+                    for (var x = 0; x < level.levelConfig.size.x; x++)
+                    for (var y = 0; y < level.levelConfig.size.y; y++)
                         Handles.Label(
                             float3(level.Grid2World(int2(x, y)), 0),
                             $"{level.cells[x, y].Type}|{level.cells[x, y].SubType}]"
