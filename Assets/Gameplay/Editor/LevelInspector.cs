@@ -48,7 +48,7 @@ public class LevelInspector : UnityEditor.Editor
                 break;
 
             case DebugLayer.Cells:
-                if (level.Cells.array != null)
+                if (level.Cells.IsInit)
                     for (var x = 0; x < level.levelConfig.size.x; x++)
                     for (var y = 0; y < level.levelConfig.size.y; y++)
                         Handles.Label(
@@ -57,13 +57,13 @@ public class LevelInspector : UnityEditor.Editor
                         );
                 break;
             case DebugLayer.Groups:
-                if (level.clusterSolver.Groups.array != null)
+                if (level.clusterSolver.Clusters.IsInit)
                 {
                     for (var x = 0; x < level.levelConfig.size.x; x++)
                     for (var y = 0; y < level.levelConfig.size.y; y++)
                         Handles.Label(
                             float3(level.Grid2World(int2(x, y)), 0), 
-                            level.clusterSolver.Groups[int2(x, y)].ToString()
+                            level.clusterSolver.Clusters[int2(x, y)].ToString()
                         );
                 }
                 break;

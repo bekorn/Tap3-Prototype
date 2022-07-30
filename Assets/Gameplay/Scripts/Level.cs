@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using Gameplay.Scripts.DataStructures;
 using UnityEngine;
-using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using float2 = Unity.Mathematics.float2;
 using float3 = Unity.Mathematics.float3;
@@ -53,13 +51,13 @@ public readonly struct ClusterSolver
 
     readonly int2 size;
     readonly Array2D<Node> nodes;
-    public readonly Array2D<(int2 group, int size)> Groups;
+    public readonly Array2D<(int2 group, int size)> Clusters;
 
     public ClusterSolver(int2 boardSize)
     {
         size = boardSize;
         nodes = new(size);
-        Groups = new(size);
+        Clusters = new(size);
     }
 
     void PrintNodes(Array2D<Cell> cells, int _x, int _y)
@@ -127,15 +125,16 @@ public readonly struct ClusterSolver
         }
 
         // Bake the linked nodes into groups
-        for (var i = 0; i < Groups.array.Length; i++)
-            Groups.array[i] = (GetRoot(nodes.array[i]), 0);
+        for (var i = 0; i < Clusters.Length; i++)
+            Clusters[i] = (GetRoot(nodes[i]), 0);
 
         // Sum the clusters
-        foreach (var node in Groups.array)
-            Groups[node.group].size++;
+        foreach (ref var cluster in Clusters)
+            Clusters[cluster.group].size++;
 
-        for (var i = 0; i < Groups.array.Length; i++)
-            Groups.array[i].size = Groups[Groups.array[i].group].size;
+        // Spread the sum
+        foreach (ref var node in Clusters)
+            node.size = Clusters[node.group].size;
     }
 }
 
@@ -237,11 +236,11 @@ public class Level : MonoBehaviour
     {
         clusterSolver.Solve(Cells);
         
-        for (var i = 0; i < Icons.array.Length; i++)
+        for (var i = 0; i < Icons.Length; i++)
         {
-            var clusterType = clusterSolver.Groups.array[i].size / 3;
+            var clusterType = clusterSolver.Clusters[i].size / 3;
             if (clusterType != 0)
-                Icons.array[i].sprite = powerUpIcons[clusterType - 1];
+                Icons[i].sprite = powerUpIcons[clusterType - 1];
         }
     }
 }
