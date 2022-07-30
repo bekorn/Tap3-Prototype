@@ -133,44 +133,49 @@ readonly struct ClusterSolver
 
 public class Level : MonoBehaviour
 {
-    public LevelConfig levelConfig;
-    public GameObject blockPrefab;
+    [SerializeField] public LevelConfig levelConfig;
+    [SerializeField] public GameObject blockPrefab;
 
     public float gridSize = 1.6f;
 
-    Transform t;
+    [SerializeField] Camera _Cam;
+    Transform _T;
     Random random = new(1235);
-    public Array2D<Cell> cells;
+    [NonSerialized] public Array2D<Cell> Cells;
+    [NonSerialized] public Array2D<Transform> Transforms;
 
     // Space transforms
-    public float2 World2Local(float2 worldPos) => float3(t.position).xy - worldPos;
-    public int2 World2Grid(float3 worldPos) => int2(World2Local(worldPos.xy) / gridSize);
+    public float2 World2Local(float2 worldPos) => worldPos - float3(_T.position).xy;
+    public int2 World2Grid(float2 worldPos) => int2(round(World2Local(worldPos) / gridSize));
 
-    public float2 Local2World(float2 localPos) => float3(t.position).xy + localPos;
+    public float2 Local2World(float2 localPos) => float3(_T.position).xy + localPos;
     public float2 Grid2World(int2 gridPos) => Local2World(float2(gridPos) * gridSize);
 
     void OnValidate()
     {
-        t = transform;
+        _T = transform;
+        _Cam = Camera.main;
     }
 
     void Start()
     {
-        cells = new Array2D<Cell>(levelConfig.size);
+        Cells = new Array2D<Cell>(levelConfig.size);
+        Transforms = new Array2D<Transform>(levelConfig.size);
 
-        float3 pos = t.position;
+        float3 pos = _T.position;
 
         for (var x = 0; x < levelConfig.size.x; x++)
         for (var y = 0; y < levelConfig.size.y; y++)
         {
-            var cell = cells[x, y] = RandomBlock();
+            var cell = Cells[x, y] = RandomBlock();
 
             var blockTransform = Instantiate(
                 blockPrefab,
                 pos + float3(gridSize * float2(x, y), 0),
                 Quaternion.identity,
-                t
+                _T
             ).transform;
+            Transforms[x, y] = blockTransform;
             var icon = blockTransform.Find("icon").GetComponent<SpriteRenderer>();
             var block = blockTransform.Find("block").GetComponent<SpriteRenderer>();
 
@@ -184,13 +189,43 @@ public class Level : MonoBehaviour
         UpdateGroups();
     }
 
+    // TODO(bekorn): this will grow into random level generation
     Cell RandomBlock() => new(ItemType.Block, random.NextInt(levelConfig.colors.Count));
 
     ClusterSolver clusterSolver;
+    
+    // input state
+    [NonSerialized] public (int2 grid, bool isIn) MousePrevious;
+    [NonSerialized] public (int2 grid, bool isIn) MouseCurrent;
+    [NonSerialized] public bool IsMouseChanged;
+
+    void Update()
+    {
+        // Update input state
+        MouseCurrent.grid = World2Grid(float3(_Cam.ScreenToWorldPoint(Input.mousePosition)).xy);
+        MouseCurrent.isIn = all(0 <= MouseCurrent.grid) && all(MouseCurrent.grid < levelConfig.size);
+        IsMouseChanged = !MouseCurrent.Equals(MousePrevious);
+
+        if (IsMouseChanged)
+        {
+            if (MousePrevious.isIn)
+                Transforms[MousePrevious.grid].localScale = float3(1f);
+
+            if (MouseCurrent.isIn)
+                Transforms[MouseCurrent.grid].localScale = float3(1.2f);
+        }
+
+        if (Input.GetMouseButtonUp(0) && MouseCurrent.isIn)
+        {
+            Debug.Log($"Clicked on grid: {MouseCurrent.grid} {Cells[MouseCurrent.grid]}");
+        }
+
+        MousePrevious = MouseCurrent;
+    }
 
     void UpdateGroups()
     {
-        clusterSolver.Solve(cells);
+        clusterSolver.Solve(Cells);
     }
 }
 }

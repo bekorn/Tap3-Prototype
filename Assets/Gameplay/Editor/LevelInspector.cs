@@ -39,12 +39,12 @@ public class LevelInspector : UnityEditor.Editor
                 break;
 
             case DebugLayer.Cells:
-                if (level.cells.array != null)
+                if (level.Cells.array != null)
                     for (var x = 0; x < level.levelConfig.size.x; x++)
                     for (var y = 0; y < level.levelConfig.size.y; y++)
                         Handles.Label(
                             float3(level.Grid2World(int2(x, y)), 0),
-                            $"{level.cells[x, y].Type}|{level.cells[x, y].SubType}]"
+                            $"{level.Cells[x, y].Type}|{level.Cells[x, y].SubType}]"
                         );
                 break;
             case DebugLayer.Groups:
