@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
-using Unity.Collections;
 using UnityEngine;
 using Unity.Mathematics;
 using static Unity.Mathematics.math;
@@ -11,6 +9,12 @@ using Random = Unity.Mathematics.Random;
 
 namespace Gameplay.Scripts
 {
+public static class MultidimensionalArrayExtensions
+{
+    public static T Get<T>(this T[,] arr, int2 idx) => arr[idx.x, idx.y];
+    public static ref T GetRef<T>(this T[,] arr, int2 idx) where T : struct => ref arr[idx.x, idx.y];
+}
+
 public enum ItemType : int { Empty, Block, ExplosO, ExplosI }
 
 public struct Cell
@@ -30,47 +34,43 @@ public struct Cell
     public override string ToString() => $"{Type}:{SubType.ToString()}";
 }
 
-struct ClusterSolver
+readonly struct ClusterSolver
 {
-    class Node
+    struct Node
     {
-        public int2 grid; // debug only
-        public Node parent = null;
+        public int2 grid;
+        public int2 parentGrid;
 
-        public bool IsRoot => parent == null;
-
-        public Node GetRoot()
+        public Node(int2 grid, int2 parentGrid)
         {
-            var node = this;
-            while (!node.IsRoot)
-                node = node.parent;
-            return node;
+            this.grid = grid;
+            this.parentGrid = parentGrid;
         }
 
-        public void AddChild(Node node)
-        {
-            if (node != this)
-                node.parent = this;
-        }
+        public bool IsRoot => parentGrid.x == -1;
 
-        public override string ToString() => $"({grid.x},{grid.y})>({(parent != null ? $"{grid.x},{grid.y}" : "---")})";
+        public bool Equals(Node other) => grid.Equals(other.grid) && parentGrid.Equals(other.parentGrid);
+
+        public override string ToString() => $"({grid.x},{grid.y})>({(IsRoot ? "---" : $"{parentGrid.x},{parentGrid.y}")})";
     }
 
-    Node[,] nodes;
-    Cell[,] cells;
+    readonly int2 size;
+    readonly Node[,] nodes;
+    readonly Cell[,] cells;
 
     public ClusterSolver(int2 boardSize)
     {
-        nodes = new Node[boardSize.x, boardSize.y];
-        cells = new Cell[boardSize.x, boardSize.y];
+        size = boardSize;
+        nodes = new Node[size.x, size.y];
+        cells = new Cell[size.x, size.y];
     }
 
     void PrintNodes(int _x, int _y)
     {
         var nodesStr = new StringBuilder($"step({_x}, {_y})\n");
-        for (var x = nodes.GetLength(0) - 1; x >= 0; x--)
+        for (var x = size.x - 1; x >= 0; x--)
         {
-            for (var y = 0; y < nodes.GetLength(1); y++)
+            for (var y = 0; y < size.y; y++)
                 nodesStr.Append($"{cells[x, y]}{nodes[x, y]} \t");
 
             nodesStr.Append("\n");
@@ -80,14 +80,27 @@ struct ClusterSolver
         Debug.Log(str);
     }
 
+    int2 GetRoot(Node node)
+    {
+        while (!node.IsRoot)
+            node = nodes.Get(node.parentGrid);
+        return node.grid;
+    }
+
+    void AddChild(int2 parent, int2 node)
+    {
+        if (!node.Equals(parent))
+            nodes.GetRef(node).parentGrid = parent;
+    }
+
     public void Solve(Cell[,] levelCells)
     {
         // clear state
-        for (var x = 0; x < nodes.GetLength(0); x++)
-        for (var y = 0; y < nodes.GetLength(1); y++)
+        for (var x = 0; x < size.x; x++)
+        for (var y = 0; y < size.y; y++)
         {
-            nodes[x, y] = new() { parent = null, grid = int2(x, y) };
-            cells[x, y] = new() { Type = ItemType.Empty };
+            nodes[x, y] = new(int2(x, y), int2(-1));
+            cells[x, y] = new(ItemType.Empty, default);
         }
 
         // bottom-left corner
@@ -95,34 +108,35 @@ struct ClusterSolver
         PrintNodes(0, 0);
 
         // bottom row
-        for (var x = 1; x < cells.GetLength(0); x++)
+        for (var x = 1; x < size.x; x++)
         {
             cells[x, 0] = levelCells[x, 0];
-            if (cells[x, 0] == cells[x - 1, 0]) nodes[x, 0].AddChild(nodes[x - 1, 0].GetRoot());
+            if (cells[x, 0] == cells[x - 1, 0]) AddChild(int2(x, 0), GetRoot(nodes[x - 1, 0]));
         }
         PrintNodes(1, 0);
-        
+
         // left column
-        for (var y = 1; y < cells.GetLength(1); y++)
+        for (var y = 1; y < size.y; y++)
         {
             cells[0, y] = levelCells[0, y];
-            if (cells[0, y] == cells[0, y - 1]) nodes[0, y].AddChild(nodes[0, y - 1].GetRoot());
+            if (cells[0, y] == cells[0, y - 1]) AddChild(int2(0, y), GetRoot(nodes[0, y - 1]));
         }
         PrintNodes(0, 1);
 
         // the rest
-        for (var x = 1; x < cells.GetLength(0); x++)
-        for (var y = 1; y < cells.GetLength(1); y++)
+        for (var x = 1; x < size.x; x++)
+        for (var y = 1; y < size.y; y++)
         {
             cells[x, y] = levelCells[x, y];
-            if (cells[x, y] == cells[x - 1, y]) nodes[x, y].AddChild(nodes[x - 1, y].GetRoot());
-            if (cells[x, y] == cells[x, y - 1]) nodes[x, y].AddChild(nodes[x, y - 1].GetRoot());
+            if (cells[x, y] == cells[x - 1, y]) AddChild(int2(x, y), GetRoot(nodes[x - 1, y]));
+            if (cells[x, y] == cells[x, y - 1]) AddChild(int2(x, y), GetRoot(nodes[x, y - 1]));
 
             PrintNodes(x, y);
         }
 
-        var clusters = new int[nodes.GetLength(0), nodes.GetLength(1)];
-        
+        var clusters = new int[size.x, size.y];
+
+
     }
 }
 
