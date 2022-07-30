@@ -7,6 +7,7 @@ using Unity.Mathematics;
 using static Unity.Mathematics.math;
 using float2 = Unity.Mathematics.float2;
 using float3 = Unity.Mathematics.float3;
+using int2 = Unity.Mathematics.int2;
 using Random = Unity.Mathematics.Random;
 
 namespace Gameplay.Scripts
@@ -30,7 +31,7 @@ public struct Cell
     public override string ToString() => $"{Type}:{SubType.ToString()}";
 }
 
-readonly struct ClusterSolver
+public readonly struct ClusterSolver
 {
     struct Node
     {
@@ -52,13 +53,13 @@ readonly struct ClusterSolver
 
     readonly int2 size;
     readonly Array2D<Node> nodes;
-    readonly Array2D<int> groups;
+    public readonly Array2D<(int2 group, int size)> Groups;
 
     public ClusterSolver(int2 boardSize)
     {
         size = boardSize;
-        nodes = new Array2D<Node>(size);
-        groups = new Array2D<int>(size);
+        nodes = new(size);
+        Groups = new(size);
     }
 
     void PrintNodes(Array2D<Cell> cells, int _x, int _y)
@@ -125,9 +126,16 @@ readonly struct ClusterSolver
             PrintNodes(cells, x, y);
         }
 
-        var clusters = new int[size.x, size.y];
+        // Bake the linked nodes into groups
+        for (var i = 0; i < Groups.array.Length; i++)
+            Groups.array[i] = (GetRoot(nodes.array[i]), 0);
 
+        // Sum the clusters
+        foreach (var node in Groups.array)
+            Groups[node.group].size++;
 
+        for (var i = 0; i < Groups.array.Length; i++)
+            Groups.array[i].size = Groups[Groups.array[i].group].size;
     }
 }
 
@@ -135,6 +143,7 @@ public class Level : MonoBehaviour
 {
     [SerializeField] public LevelConfig levelConfig;
     [SerializeField] public GameObject blockPrefab;
+    [SerializeField] public Sprite[] powerUpIcons;
 
     public float gridSize = 1.6f;
 
@@ -143,6 +152,7 @@ public class Level : MonoBehaviour
     Random random = new(1235);
     [NonSerialized] public Array2D<Cell> Cells;
     [NonSerialized] public Array2D<Transform> Transforms;
+    [NonSerialized] public Array2D<SpriteRenderer> Icons;
 
     // Space transforms
     public float2 World2Local(float2 worldPos) => worldPos - float3(_T.position).xy;
@@ -159,8 +169,9 @@ public class Level : MonoBehaviour
 
     void Start()
     {
-        Cells = new Array2D<Cell>(levelConfig.size);
-        Transforms = new Array2D<Transform>(levelConfig.size);
+        Cells = new (levelConfig.size);
+        Transforms = new (levelConfig.size);
+        Icons = new (levelConfig.size);
 
         float3 pos = _T.position;
 
@@ -169,14 +180,13 @@ public class Level : MonoBehaviour
         {
             var cell = Cells[x, y] = RandomBlock();
 
-            var blockTransform = Instantiate(
+            var blockTransform = Transforms[x, y] = Instantiate(
                 blockPrefab,
                 pos + float3(gridSize * float2(x, y), 0),
                 Quaternion.identity,
                 _T
             ).transform;
-            Transforms[x, y] = blockTransform;
-            var icon = blockTransform.Find("icon").GetComponent<SpriteRenderer>();
+            var icon = Icons[x, y] = blockTransform.Find("icon").GetComponent<SpriteRenderer>();
             var block = blockTransform.Find("block").GetComponent<SpriteRenderer>();
 
             var color = levelConfig.colors[cell.SubType];
@@ -192,7 +202,7 @@ public class Level : MonoBehaviour
     // TODO(bekorn): this will grow into random level generation
     Cell RandomBlock() => new(ItemType.Block, random.NextInt(levelConfig.colors.Count));
 
-    ClusterSolver clusterSolver;
+    public ClusterSolver clusterSolver;
     
     // input state
     [NonSerialized] public (int2 grid, bool isIn) MousePrevious;
@@ -226,6 +236,13 @@ public class Level : MonoBehaviour
     void UpdateGroups()
     {
         clusterSolver.Solve(Cells);
+        
+        for (var i = 0; i < Icons.array.Length; i++)
+        {
+            var clusterType = clusterSolver.Groups.array[i].size / 3;
+            if (clusterType != 0)
+                Icons.array[i].sprite = powerUpIcons[clusterType - 1];
+        }
     }
 }
 }

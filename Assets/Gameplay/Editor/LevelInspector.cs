@@ -33,9 +33,18 @@ public class LevelInspector : UnityEditor.Editor
                 break;
             case DebugLayer.Grid:
                 if (level.levelConfig != null)
+                {
                     for (var x = 0; x < level.levelConfig.size.x; x++)
                     for (var y = 0; y < level.levelConfig.size.y; y++)
                         Gizmos.DrawSphere(float3(level.Grid2World(int2(x, y)), 0), 0.1f);
+
+                    var bl = float3(level.Grid2World(int2(0, 0)) - 0.5f * level.gridSize, 0);
+                    var tr = float3(level.Grid2World(level.levelConfig.size) - 0.5f * level.gridSize, 0);
+                    for (var x = 0; x <= level.levelConfig.size.x; x++) // vertical lines
+                        Gizmos.DrawLine(float3(bl.x + x * level.gridSize, bl.y, 0), float3(bl.x + x * level.gridSize, tr.y, 0));
+                    for (var y = 0; y <= level.levelConfig.size.y; y++) // horizontal lines
+                        Gizmos.DrawLine(float3(bl.x, bl.y + y * level.gridSize, 0), float3(tr.x, bl.y + y * level.gridSize, 0));
+                }
                 break;
 
             case DebugLayer.Cells:
@@ -48,6 +57,15 @@ public class LevelInspector : UnityEditor.Editor
                         );
                 break;
             case DebugLayer.Groups:
+                if (level.clusterSolver.Groups.array != null)
+                {
+                    for (var x = 0; x < level.levelConfig.size.x; x++)
+                    for (var y = 0; y < level.levelConfig.size.y; y++)
+                        Handles.Label(
+                            float3(level.Grid2World(int2(x, y)), 0), 
+                            level.clusterSolver.Groups[int2(x, y)].ToString()
+                        );
+                }
                 break;
         }
     }

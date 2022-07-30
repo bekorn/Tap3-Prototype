@@ -557,7 +557,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   levelConfig: {fileID: 11400000, guid: d1fa7103edcf9e243bd385479dc6f456, type: 2}
   blockPrefab: {fileID: 3969426728626896629, guid: dbe6e4e3103c5f84182ca1302e72914a, type: 3}
+  powerUpIcons:
+  - {fileID: 21300000, guid: 4c71210b9543ec14a8ce8d6664b89bbd, type: 3}
+  - {fileID: 21300000, guid: 6c22b5136b9559946805743a0104df24, type: 3}
+  - {fileID: 21300000, guid: ab8ab0f146851974b9c128500a488213, type: 3}
+  - {fileID: 21300000, guid: 0ea39beb67a183a4cbce00dcdf2547ad, type: 3}
   gridSize: 1.6
+  _Cam: {fileID: 519420031}
 --- !u!4 &1917156145
 Transform:
   m_ObjectHideFlags: 0
