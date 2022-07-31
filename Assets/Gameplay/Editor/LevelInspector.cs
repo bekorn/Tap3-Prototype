@@ -7,7 +7,7 @@ using static Unity.Mathematics.math;
 
 namespace Gameplay.Editor
 {
-[CustomEditor(typeof(Level))]
+[CustomEditor(typeof(Board))]
 public class LevelInspector : UnityEditor.Editor
 {
     enum DebugLayer { None, Grid, Cells, Groups }
@@ -23,7 +23,7 @@ public class LevelInspector : UnityEditor.Editor
     }
 
     [DrawGizmo(GizmoType.Selected)]
-    static void DrawGizmos(Level level, GizmoType gizmoType)
+    static void DrawGizmos(Board board, GizmoType gizmoType)
     {
         // TODO(bekorn): stylize the handles to improve readability
         
@@ -32,38 +32,38 @@ public class LevelInspector : UnityEditor.Editor
             case DebugLayer.None:
                 break;
             case DebugLayer.Grid:
-                if (level.levelConfig != null)
+                if (board.level != null)
                 {
-                    for (var x = 0; x < level.levelConfig.size.x; x++)
-                    for (var y = 0; y < level.levelConfig.size.y; y++)
-                        Gizmos.DrawSphere(float3(level.Grid2World(int2(x, y)), 0), 0.1f);
+                    for (var x = 0; x < board.level.size.x; x++)
+                    for (var y = 0; y < board.level.size.y; y++)
+                        Gizmos.DrawSphere(float3(board.Grid2World(int2(x, y)), 0), 0.1f);
 
-                    var bl = float3(level.Grid2World(int2(0, 0)) - 0.5f * level.gridSize, 0);
-                    var tr = float3(level.Grid2World(level.levelConfig.size) - 0.5f * level.gridSize, 0);
-                    for (var x = 0; x <= level.levelConfig.size.x; x++) // vertical lines
-                        Gizmos.DrawLine(float3(bl.x + x * level.gridSize, bl.y, 0), float3(bl.x + x * level.gridSize, tr.y, 0));
-                    for (var y = 0; y <= level.levelConfig.size.y; y++) // horizontal lines
-                        Gizmos.DrawLine(float3(bl.x, bl.y + y * level.gridSize, 0), float3(tr.x, bl.y + y * level.gridSize, 0));
+                    var bl = float3(board.Grid2World(int2(0, 0)) - 0.5f * board.gridSize, 0);
+                    var tr = float3(board.Grid2World(board.level.size) - 0.5f * board.gridSize, 0);
+                    for (var x = 0; x <= board.level.size.x; x++) // vertical lines
+                        Gizmos.DrawLine(float3(bl.x + x * board.gridSize, bl.y, 0), float3(bl.x + x * board.gridSize, tr.y, 0));
+                    for (var y = 0; y <= board.level.size.y; y++) // horizontal lines
+                        Gizmos.DrawLine(float3(bl.x, bl.y + y * board.gridSize, 0), float3(tr.x, bl.y + y * board.gridSize, 0));
                 }
                 break;
 
             case DebugLayer.Cells:
-                if (level.Cells.IsInit)
-                    for (var x = 0; x < level.levelConfig.size.x; x++)
-                    for (var y = 0; y < level.levelConfig.size.y; y++)
+                if (board.Cells.IsInit)
+                    for (var x = 0; x < board.level.size.x; x++)
+                    for (var y = 0; y < board.level.size.y; y++)
                         Handles.Label(
-                            float3(level.Grid2World(int2(x, y)), 0),
-                            $"{level.Cells[x, y].Type}|{level.Cells[x, y].SubType}]"
+                            float3(board.Grid2World(int2(x, y)), 0),
+                            $"{board.Cells[x, y].Type}|{board.Cells[x, y].SubType}]"
                         );
                 break;
             case DebugLayer.Groups:
-                if (level.clusterSolver.Clusters.IsInit)
+                if (board.clusterSolver.Clusters.IsInit)
                 {
-                    for (var x = 0; x < level.levelConfig.size.x; x++)
-                    for (var y = 0; y < level.levelConfig.size.y; y++)
+                    for (var x = 0; x < board.level.size.x; x++)
+                    for (var y = 0; y < board.level.size.y; y++)
                         Handles.Label(
-                            float3(level.Grid2World(int2(x, y)), 0), 
-                            level.clusterSolver.Clusters[int2(x, y)].ToString()
+                            float3(board.Grid2World(int2(x, y)), 0), 
+                            board.clusterSolver.Clusters[int2(x, y)].ToString()
                         );
                 }
                 break;

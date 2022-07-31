@@ -217,7 +217,7 @@ RectTransform:
   m_Children:
   - {fileID: 1020973182}
   m_Father: {fileID: 0}
-  m_RootOrder: 3
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
@@ -480,52 +480,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 4
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1150979229
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1150979230}
-  - component: {fileID: 1150979231}
-  m_Layer: 0
-  m_Name: board
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1150979230
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1150979229}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1150979231
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1150979229}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7cf07e753b9e95245932d78a8c5286d9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &1917156143
 GameObject:
   m_ObjectHideFlags: 0
@@ -537,7 +493,7 @@ GameObject:
   - component: {fileID: 1917156145}
   - component: {fileID: 1917156144}
   m_Layer: 0
-  m_Name: level
+  m_Name: board
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -555,7 +511,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 78030b6bf49146740881a97b77428ebb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  levelConfig: {fileID: 11400000, guid: d1fa7103edcf9e243bd385479dc6f456, type: 2}
+  level: {fileID: 11400000, guid: d1fa7103edcf9e243bd385479dc6f456, type: 2}
   blockPrefab: {fileID: 3969426728626896629, guid: dbe6e4e3103c5f84182ca1302e72914a, type: 3}
   powerHints:
   - {fileID: 21300000, guid: 5f307b1a9c4b2ed47a392035595688c0, type: 3}
@@ -582,5 +538,5 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
