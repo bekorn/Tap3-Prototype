@@ -10,7 +10,7 @@ using Random = Unity.Mathematics.Random;
 
 namespace Gameplay.Scripts
 {
-public enum ItemType : int { Empty, Block, ExplosO, ExplosI }
+public enum ItemType : int { Empty, Block, ExplosO, ExplosI, Triangle, Star }
 
 public struct Cell
 {
@@ -60,7 +60,6 @@ public readonly struct ClusterSolver
 
     void PrintNodes(Array2D<Cell> cells, int _x, int _y)
     {
-        return;
         var nodesStr = new StringBuilder($"step({_x}, {_y})\n");
         for (var x = size.x - 1; x >= 0; x--)
         {
@@ -97,21 +96,21 @@ public readonly struct ClusterSolver
         }
 
         // bottom-left corner
-        PrintNodes(cells, 0, 0);
+        //PrintNodes(cells, 0, 0);
 
         // bottom row
         for (var x = 1; x < size.x; x++)
         {
             if (cells[x, 0] == cells[x - 1, 0]) AddChild(int2(x, 0), GetRoot(nodes[x - 1, 0]));
         }
-        PrintNodes(cells, 1, 0);
+        //PrintNodes(cells, 1, 0);
 
         // left column
         for (var y = 1; y < size.y; y++)
         {
             if (cells[0, y] == cells[0, y - 1]) AddChild(int2(0, y), GetRoot(nodes[0, y - 1]));
         }
-        PrintNodes(cells, 0, 1);
+        //PrintNodes(cells, 0, 1);
 
         // the rest
         for (var x = 1; x < size.x; x++)
@@ -120,7 +119,7 @@ public readonly struct ClusterSolver
             if (cells[x, y] == cells[x - 1, y]) AddChild(int2(x, y), GetRoot(nodes[x - 1, y]));
             if (cells[x, y] == cells[x, y - 1]) AddChild(int2(x, y), GetRoot(nodes[x, y - 1]));
 
-            PrintNodes(cells, x, y);
+            //PrintNodes(cells, x, y);
         }
 
         // Bake the linked nodes into groups
@@ -141,7 +140,8 @@ public class Level : MonoBehaviour
 {
     [SerializeField] public LevelConfig levelConfig;
     [SerializeField] public GameObject blockPrefab;
-    [SerializeField] public Sprite[] powerUpIcons;
+    [SerializeField] public Sprite[] powerHints;
+    [SerializeField] public Sprite[] powerIcons;
 
     public float gridSize = 1.6f;
 
@@ -151,6 +151,7 @@ public class Level : MonoBehaviour
     [NonSerialized] public Array2D<Cell> Cells;
     [NonSerialized] public Array2D<Transform> Transforms;
     [NonSerialized] public Array2D<SpriteRenderer> Icons;
+    [NonSerialized] public Array2D<SpriteRenderer> Bases;
 
     // Space transforms
     public float2 World2Local(float2 worldPos) => worldPos - float3(_T.position).xy;
@@ -167,9 +168,10 @@ public class Level : MonoBehaviour
 
     void Start()
     {
-        Cells = new (levelConfig.size);
-        Transforms = new (levelConfig.size);
-        Icons = new (levelConfig.size);
+        Cells = new(levelConfig.size);
+        Transforms = new(levelConfig.size);
+        Icons = new(levelConfig.size);
+        Bases = new(levelConfig.size);
 
         float3 pos = _T.position;
 
@@ -185,7 +187,7 @@ public class Level : MonoBehaviour
                 _T
             ).transform;
             var icon = Icons[x, y] = blockTransform.Find("icon").GetComponent<SpriteRenderer>();
-            var block = blockTransform.Find("block").GetComponent<SpriteRenderer>();
+            var block = Bases[x, y] = blockTransform.Find("block").GetComponent<SpriteRenderer>();
 
             var color = levelConfig.colors[cell.SubType];
             block.color = color;
@@ -201,7 +203,7 @@ public class Level : MonoBehaviour
     Cell RandomBlock() => new(ItemType.Block, random.NextInt(levelConfig.colors.Count));
 
     public ClusterSolver clusterSolver;
-    
+
     // input state
     [NonSerialized] public (int2 grid, bool isIn) MousePrevious;
     [NonSerialized] public (int2 grid, bool isIn) MouseCurrent;
@@ -231,14 +233,33 @@ public class Level : MonoBehaviour
         {
             Debug.Log($"MouseAction on grid: {MouseCurrent.grid} {Cells[MouseCurrent.grid]}");
 
-            var clusterGrid = clusterSolver.Clusters[MouseCurrent.grid].group;
+            // Remove the cluster
+            var cluster = clusterSolver.Clusters[MouseCurrent.grid];
             for (var i = 0; i < clusterSolver.Clusters.Length; i++)
-                if (clusterSolver.Clusters[i].group.Equals(clusterGrid))
+                if (clusterSolver.Clusters[i].group.Equals(cluster.group))
                 {
                     Transforms[i].gameObject.SetActive(false);
                     Cells[i].Type = ItemType.Empty;
                 }
-            
+
+            // Create a power
+            var powerType = cluster.size / 3 - 1;
+            if (powerType >= 0)
+            {
+                Transforms[MouseCurrent.grid].gameObject.SetActive(true);
+                Cells[MouseCurrent.grid] = powerType switch
+                {
+                    0 => new(ItemType.Triangle, default),
+                    1 => new(ItemType.ExplosI, random.NextInt(0, 2)),
+                    2 => new(ItemType.ExplosO, default),
+                    _ => new(ItemType.Star, default),
+                };
+                Icons[MouseCurrent.grid].sprite = powerIcons[powerType];
+                Bases[MouseCurrent.grid].enabled = false;
+
+                Debug.Log($"Created a power: {Cells[MouseCurrent.grid]}, icon: {Icons[MouseCurrent.grid].sprite.name}");
+            }
+
             UpdateGroups();
         }
 
@@ -248,16 +269,14 @@ public class Level : MonoBehaviour
     void UpdateGroups()
     {
         clusterSolver.Solve(Cells);
-        
-        for (var i = 0; i < Icons.Length; i++)
-        {
-            var type = clusterSolver.Clusters[i].size / 3;
-            Icons[i].sprite = type switch
-            {
-                0 => levelConfig.icons[Cells[i].SubType],
-                _ => powerUpIcons[type - 1],
-            };
-        }
+
+        for (var i = 0; i < Cells.Length; i++)
+            if (Cells[i] is { Type: ItemType.Block } block)
+                Icons[i].sprite = (clusterSolver.Clusters[i].size / 3) switch
+                {
+                    0 => levelConfig.icons[Cells[i].SubType],
+                    var powerType => powerHints[powerType - 1],
+                };
     }
 }
 }
