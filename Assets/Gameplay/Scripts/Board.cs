@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using Gameplay.Scripts.DataStructures;
 using UnityEngine;
@@ -153,6 +154,12 @@ public class Board : MonoBehaviour
     [NonSerialized] public Array2D<SpriteRenderer> Icons;
     [NonSerialized] public Array2D<SpriteRenderer> Bases;
 
+    // Pooling
+    [NonSerialized] Stack<(Transform, SpriteRenderer, SpriteRenderer)> pool;
+    (Transform, SpriteRenderer, SpriteRenderer) GetFromPool() => pool.Pop();
+    void ReturnToPool(int2 grid) => pool.Push((Transforms[grid], Icons[grid], Bases[grid]));
+    void ReturnToPool(int x) => pool.Push((Transforms[x], Icons[x], Bases[x]));
+
     // Space transforms
     public float2 World2Local(float2 worldPos) => worldPos - float3(_T.position).xy;
     public int2 World2Grid(float2 worldPos) => int2(round(World2Local(worldPos) / gridSize));
@@ -172,6 +179,8 @@ public class Board : MonoBehaviour
         Transforms = new(level.size);
         Icons = new(level.size);
         Bases = new(level.size);
+        
+        pool = new(level.size.x * level.size.y);
 
         float3 pos = _T.position;
 
@@ -238,15 +247,16 @@ public class Board : MonoBehaviour
             for (var i = 0; i < clusterSolver.Clusters.Length; i++)
                 if (clusterSolver.Clusters[i].group.Equals(cluster.group))
                 {
-                    Transforms[i].gameObject.SetActive(false);
                     Cells[i].Type = ItemType.Empty;
+                    Transforms[i].gameObject.SetActive(false);
+                    ReturnToPool(i);
                 }
 
             // Create a power
             var powerType = cluster.size / 3 - 1;
             if (powerType >= 0)
             {
-                Transforms[MouseCurrent.grid].gameObject.SetActive(true);
+                (Transforms[MouseCurrent.grid], Icons[MouseCurrent.grid], Bases[MouseCurrent.grid]) = GetFromPool();
                 Cells[MouseCurrent.grid] = powerType switch
                 {
                     0 => new(ItemType.Triangle, default),
@@ -254,10 +264,49 @@ public class Board : MonoBehaviour
                     2 => new(ItemType.ExplosO, default),
                     _ => new(ItemType.Star, default),
                 };
+                Transforms[MouseCurrent.grid].gameObject.SetActive(true);
+                Transforms[MouseCurrent.grid].position = float3(Grid2World(MouseCurrent.grid), 0);
                 Icons[MouseCurrent.grid].sprite = powerIcons[powerType];
                 Bases[MouseCurrent.grid].enabled = false;
 
                 Debug.Log($"Created a power: {Cells[MouseCurrent.grid]}, icon: {Icons[MouseCurrent.grid].sprite.name}");
+            }
+
+            // Update by columns
+            for (var x = 0; x < level.size.x; x++)
+            {
+                // Make them fall
+                var gap = 0;
+                for (var y = 0; y < level.size.y; y++)
+                {
+                    if (Cells[x, y].Type == ItemType.Empty)
+                    {
+                        gap++;
+                    }
+                    else if (gap > 0)
+                    {
+                        Transforms[x, y].Translate(0, -1 * gap * gridSize, 0);
+                        Transforms[x, y - gap] = Transforms[x, y];
+                        Cells[x, y - gap] = Cells[x, y];
+                        Icons[x, y - gap] = Icons[x, y];
+                        Bases[x, y - gap] = Bases[x, y];
+                    }
+                }
+
+                // Spawn new blocks
+                for (var y = level.size.y - gap; y < level.size.y; y++)
+                {
+                    (Transforms[x, y], Icons[x, y], Bases[x, y]) = GetFromPool();
+                    Transforms[x, y].gameObject.SetActive(true);
+                    Transforms[x, y].position = float3(Grid2World(int2(x, y)), 0);
+
+                    var cell = Cells[x, y] = RandomBlock();
+                    var color = level.colors[cell.SubType];
+                    Bases[x, y].color = color;
+                    Bases[x, y].enabled = true;
+                    Icons[x, y].color = Color.Lerp(color, Color.black, 0.1f);
+                    Icons[x, y].sprite = level.icons[cell.SubType];
+                }
             }
 
             UpdateGroups();
