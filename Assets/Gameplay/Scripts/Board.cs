@@ -167,7 +167,7 @@ public class Board : MonoBehaviour
     public float2 Local2World(float2 localPos) => float3(_T.position).xy + localPos;
     public float2 Grid2World(int2 gridPos) => Local2World(float2(gridPos) * gridSize);
 
-    void OnValidate()
+    void OnValidate() // not Awake because custom inspector use the space transform methods that require _T
     {
         _T = transform;
         _Cam = Camera.main;
@@ -179,7 +179,7 @@ public class Board : MonoBehaviour
         Transforms = new(level.size);
         Icons = new(level.size);
         Bases = new(level.size);
-        
+
         pool = new(level.size.x * level.size.y);
 
         float3 pos = _T.position;
@@ -207,9 +207,6 @@ public class Board : MonoBehaviour
         clusterSolver = new ClusterSolver(level.size);
         UpdateGroups();
     }
-
-    // TODO(bekorn): this will grow into random level generation
-    Cell RandomBlock() => new(ItemType.Block, random.NextInt(level.colors.Count));
 
     public ClusterSolver clusterSolver;
 
@@ -253,24 +250,9 @@ public class Board : MonoBehaviour
                 }
 
             // Create a power
-            var powerType = cluster.size / 3 - 1;
-            if (powerType >= 0)
-            {
-                (Transforms[MouseCurrent.grid], Icons[MouseCurrent.grid], Bases[MouseCurrent.grid]) = GetFromPool();
-                Cells[MouseCurrent.grid] = powerType switch
-                {
-                    0 => new(ItemType.Triangle, default),
-                    1 => new(ItemType.ExplosI, random.NextInt(0, 2)),
-                    2 => new(ItemType.ExplosO, default),
-                    _ => new(ItemType.Star, default),
-                };
-                Transforms[MouseCurrent.grid].gameObject.SetActive(true);
-                Transforms[MouseCurrent.grid].position = float3(Grid2World(MouseCurrent.grid), 0);
-                Icons[MouseCurrent.grid].sprite = powerIcons[powerType];
-                Bases[MouseCurrent.grid].enabled = false;
-
-                Debug.Log($"Created a power: {Cells[MouseCurrent.grid]}, icon: {Icons[MouseCurrent.grid].sprite.name}");
-            }
+            var powerLevel = cluster.size / 3 - 1;
+            if (powerLevel >= 0)
+                CreatePower(MouseCurrent.grid, min(powerLevel, powerIcons.Length - 1)); // TODO(bekorn): rules
 
             // Update by columns
             for (var x = 0; x < level.size.x; x++)
@@ -295,18 +277,7 @@ public class Board : MonoBehaviour
 
                 // Spawn new blocks
                 for (var y = level.size.y - gap; y < level.size.y; y++)
-                {
-                    (Transforms[x, y], Icons[x, y], Bases[x, y]) = GetFromPool();
-                    Transforms[x, y].gameObject.SetActive(true);
-                    Transforms[x, y].position = float3(Grid2World(int2(x, y)), 0);
-
-                    var cell = Cells[x, y] = RandomBlock();
-                    var color = level.colors[cell.SubType];
-                    Bases[x, y].color = color;
-                    Bases[x, y].enabled = true;
-                    Icons[x, y].color = Color.Lerp(color, Color.black, 0.1f);
-                    Icons[x, y].sprite = level.icons[cell.SubType];
-                }
+                    CreateBlock(int2(x, y));
             }
 
             UpdateGroups();
@@ -315,16 +286,50 @@ public class Board : MonoBehaviour
         MousePrevious = MouseCurrent;
     }
 
+    void CreatePower(int2 grid, int powerLevel)
+    {
+        Cells[MouseCurrent.grid] = powerLevel switch
+        {
+            0 => new(ItemType.Triangle, default),
+            1 => new(ItemType.ExplosI, random.NextInt(0, 2)),
+            2 => new(ItemType.ExplosO, default),
+            3 => new(ItemType.Star, default),
+        };
+
+        var (t, i, b) = (Transforms[grid], Icons[grid], Bases[grid]) = GetFromPool();
+        t.gameObject.SetActive(true);
+        t.position = float3(Grid2World(MouseCurrent.grid), 0);
+        i.sprite = powerIcons[powerLevel];
+        b.enabled = false;
+    }
+
+    Cell RandomBlock() => new(ItemType.Block, random.NextInt(level.colors.Count));
+
+    void CreateBlock(int2 grid)
+    {
+        var (t, i, b) = (Transforms[grid], Icons[grid], Bases[grid]) = GetFromPool();
+        t.gameObject.SetActive(true);
+        t.position = float3(Grid2World(int2(grid)), 0);
+
+        var cell = Cells[grid] = RandomBlock();
+        var color = level.colors[cell.SubType];
+        b.color = color;
+        b.enabled = true;
+        i.color = Color.Lerp(color, Color.black, 0.1f); // TODO(bekorn): precompute in level
+        i.sprite = level.icons[cell.SubType];
+    }
+
     void UpdateGroups()
     {
         clusterSolver.Solve(Cells);
 
+        // Set blocks' power hints
         for (var i = 0; i < Cells.Length; i++)
-            if (Cells[i] is { Type: ItemType.Block } block)
-                Icons[i].sprite = (clusterSolver.Clusters[i].size / 3) switch
+            if (Cells[i].Type == ItemType.Block)
+                Icons[i].sprite = (clusterSolver.Clusters[i].size / 3) switch // TODO(bekorn): rules
                 {
                     0 => level.icons[Cells[i].SubType],
-                    var powerType => powerHints[powerType - 1],
+                    var powerType => powerHints[clamp(powerType - 1, 0, powerHints.Length - 1)], // TODO(bekorn): rules
                 };
     }
 }
