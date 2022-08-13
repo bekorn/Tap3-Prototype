@@ -20,6 +20,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 15137283e8b057749adab861e8bfb87c, type: 3}
   - {fileID: 21300000, guid: b5ccca0fd4606804abe22f938132a92a, type: 3}
   - {fileID: 21300000, guid: f95b70a62ef8f7648bc2efe64078298e, type: 3}
+  cell: {fileID: 21300000, guid: 106fd0a4ef6183142904e96f2f528ad5, type: 3}
   size:
     x: 8
     y: 5

@@ -205,6 +205,7 @@ SpriteAtlas:
   - {fileID: 21300000, guid: 190cb7cd44d68a9498955e2b63696a8a, type: 3}
   - {fileID: 21300000, guid: 05b9dbcd6a2db7d48b2495533c0d156e, type: 3}
   - {fileID: 21300000, guid: ea24aa0ecd5cdb04ab6d3b7714a31edb, type: 3}
+  - {fileID: 21300000, guid: 73ad712ed2fd3aa40b3dc7c6f7172011, type: 3}
   - {fileID: 21300000, guid: 2ee48f2e60e5f8f4281b5dcbfb0fdd80, type: 3}
   - {fileID: 21300000, guid: 8692764ef3cd38246b81468f1a946748, type: 3}
   - {fileID: 21300000, guid: 3300656e95169a94584152f278028f10, type: 3}
@@ -381,6 +382,7 @@ SpriteAtlas:
   - genericItem_white_163
   - genericItem_white_091
   - genericItem_white_062
+  - cell
   - genericItem_white_074
   - genericItem_white_146
   - genericItem_white_020
