@@ -146,8 +146,9 @@ public class Board : MonoBehaviour
 
     public float gridSize = 1.6f;
 
-    [SerializeField] Camera _Cam;
-    Transform _T;
+    [HideInInspector][SerializeField] Transform _T;
+    [HideInInspector][SerializeField] Camera _Cam;
+    [HideInInspector][SerializeField] BackBoard backBoard;
     Random random = new(1235);
     [NonSerialized] public Array2D<Cell> Cells;
     [NonSerialized] public Array2D<Transform> Transforms;
@@ -171,6 +172,7 @@ public class Board : MonoBehaviour
     {
         _T = transform;
         _Cam = Camera.main;
+        backBoard = GetComponentInChildren<BackBoard>();
     }
 
     void Start()
@@ -238,6 +240,9 @@ public class Board : MonoBehaviour
         if (Input.GetMouseButtonUp(0) && MouseCurrent.grid.Equals(MouseDownGrid) && Cells[MouseCurrent.grid].Type != ItemType.Empty)
         {
             Debug.Log($"MouseAction on grid: {MouseCurrent.grid} {Cells[MouseCurrent.grid]}");
+            
+            if (Cells[MouseCurrent.grid] is { Type: ItemType.Block, SubType: var subType })
+                backBoard.React(level.colors[subType]);
 
             // Remove the cluster
             var cluster = clusterSolver.Clusters[MouseCurrent.grid];

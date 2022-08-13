@@ -1,10 +1,48 @@
 ﻿using UnityEngine;
+using UnityEngine.UIElements.Experimental;
+using static Unity.Mathematics.math;
 
 namespace Gameplay.Scripts
 {
-[RequireComponent(typeof(MeshRenderer), typeof(MeshFilter))]
 public class BackBoard : MonoBehaviour
 {
+    LineRenderer border;
+    MeshRenderer backCells;
+    Material backCellMat, borderMat;
+
+    static readonly int _Thickness = Shader.PropertyToID("_Thickness");
+    static readonly int _Constrain = Shader.PropertyToID("_Constrain");
+    static readonly int _Color = Shader.PropertyToID("_Color");
+
+    struct State
+    {
+        public Color color;
+        public float thickness, constrain;
+    }
+
+    readonly State idle = new()
+    {
+        color = new(0, 0, 0, 0.5f),
+        thickness = 0.4f,
+        constrain = 2.8f,
+    };
+
+    State peak = new()
+    {
+        thickness = 0.2f,
+        constrain = 0f,
+    };
+
+    State current;
+
+    void UpdateMaterials()
+    {
+        borderMat.SetFloat(_Thickness, current.thickness);
+        borderMat.SetFloat(_Constrain, current.constrain);
+        borderMat.SetColor(_Color, current.color);
+        backCellMat.SetColor(_Color, current.color);
+    }
+
     void Start()
     {
         var board = transform.parent.GetComponent<Board>();
@@ -13,8 +51,11 @@ public class BackBoard : MonoBehaviour
 
         var level = board.level;
 
-        // create and set cell mesh
+        // configure backCells
         {
+            backCells = GetComponent<MeshRenderer>();
+            backCellMat = backCells.sharedMaterial;
+
             var mesh = GetComponent<MeshFilter>().mesh = new Mesh();
             var quadCount = level.size.x * level.size.y;
             var verts = new Vector3[4 * quadCount];
@@ -53,10 +94,10 @@ public class BackBoard : MonoBehaviour
             mesh.UploadMeshData(true);
         }
 
-        // configure line renderer for border
+        // configure border
         {
             var width = 0.3f;
-            var border = GetComponent<LineRenderer>();
+            border = GetComponent<LineRenderer>();
             border.widthCurve = AnimationCurve.Constant(0, 1, 2f * width);
             var corners = new Vector3[]
             {
@@ -67,12 +108,55 @@ public class BackBoard : MonoBehaviour
             };
             border.SetPositions(corners);
 
-            var borderLength = Vector3.Distance(corners[0], corners[1])
-                               + Vector3.Distance(corners[1], corners[2])
-                               + Vector3.Distance(corners[2], corners[3])
-                               + Vector3.Distance(corners[3], corners[0])
-                               + 0.001f;
-            border.sharedMaterial.SetFloat("BorderLength", borderLength);
+            borderMat = border.sharedMaterial;
+            borderMat.SetFloat(
+                "BorderLength",
+                Vector3.Distance(corners[0], corners[1]) + Vector3.Distance(corners[1], corners[2]) +
+                Vector3.Distance(corners[2], corners[3]) + Vector3.Distance(corners[3], corners[0]) + 0.001f
+            );
+        }
+
+        // configure state & materials
+        current = idle;
+        UpdateMaterials();
+    }
+
+    float reactionTime = -100f;
+    State reaction;
+
+    public void React(Color color)
+    {
+        peak.color = color;
+        reactionTime = Time.realtimeSinceStartup;
+        reaction = current;
+    }
+
+    void Update()
+    {
+        const float total = 4f;
+        const float attack = 0.6f / total;
+
+        var t = remap(0, total, 0, 1, Time.realtimeSinceStartup - reactionTime);
+        if (t <= 1.01f)
+        {
+            t = saturate(t);
+            if (t < attack)
+            {
+                // reaction -> peak
+                t = Easing.OutBack(t / attack);
+                current.thickness = lerp(reaction.thickness, peak.thickness, t);
+                current.constrain = lerp(reaction.constrain, peak.constrain, t);
+                current.color = Color.Lerp(reaction.color, peak.color, t);
+            }
+            else
+            {
+                // peak -> idle
+                t = Easing.InQuad(unlerp(attack, 1f, t));
+                current.thickness = lerp(peak.thickness, idle.thickness, t);
+                current.constrain = lerp(peak.constrain, idle.constrain, t);
+                current.color = Color.Lerp(peak.color, idle.color, t);
+            }
+            UpdateMaterials();
         }
     }
 }
