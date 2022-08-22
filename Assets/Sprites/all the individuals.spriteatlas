@@ -385,7 +385,7 @@ SpriteAtlas:
   - genericItem_white_074
   - genericItem_white_146
   - genericItem_white_020
-  - backCell
+  - cell
   - genericItem_white_122
   - genericItem_white_055
   - genericItem_white_022

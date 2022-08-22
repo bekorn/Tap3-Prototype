@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using Gameplay.Scripts.DataStructures;
 using UnityEngine;
 using static Unity.Mathematics.math;
@@ -11,28 +10,31 @@ using Random = Unity.Mathematics.Random;
 
 namespace Gameplay.Scripts
 {
-public enum ItemType : int { Empty, Block, ExplosO, ExplosI, Triangle, Star }
-
-public struct Cell
+public struct Piece
 {
-    public ItemType Type;
-    public int SubType;
-
-    public Cell(ItemType type, int subType)
+    public enum Type : int
     {
-        Type = type;
-        SubType = subType;
+        Empty, Block, ExplosO, ExplosI,
+        Triangle, Star
     }
 
-    public static bool operator ==(Cell c1, Cell c2) => c1.Type == c2.Type && c1.SubType == c2.SubType;
-    public static bool operator !=(Cell c1, Cell c2) => !(c1 == c2);
+    public Type type;
+    public int variant;
 
-    public override string ToString() => $"{Type}:{SubType.ToString()}";
+    public Piece(Type type, int variant) => (this.type, this.variant) = (type, variant);
+
+    public static bool operator ==(Piece c1, Piece c2) => c1.type == c2.type && c1.variant == c2.variant;
+    public static bool operator !=(Piece c1, Piece c2) => !(c1 == c2);
+    public bool Equals(Piece other) => type == other.type && variant == other.variant;
+    public override bool Equals(object obj) => obj is Piece other && Equals(other);
+    public override int GetHashCode() => HashCode.Combine((int)type, variant);
+
+    public override string ToString() => $"{type}:{variant.ToString()}";
 }
 
 public readonly struct ClusterSolver
 {
-    struct Node
+    public struct Node
     {
         public int2 grid;
         public int2 parentGrid;
@@ -45,87 +47,66 @@ public readonly struct ClusterSolver
 
         public bool IsRoot => parentGrid.x == -1;
 
-        public override string ToString() => $"({grid.x},{grid.y})>({(IsRoot ? "---" : $"{parentGrid.x},{parentGrid.y}")})";
+        public override string ToString() =>
+            $"({grid.x},{grid.y})>({(IsRoot ? "---" : $"{parentGrid.x},{parentGrid.y}")})";
     }
 
     readonly int2 size;
-    readonly Array2D<Node> nodes;
+    public readonly Array2D<Node> Nodes;
     public readonly Array2D<(int2 group, int size)> Clusters;
 
     public ClusterSolver(int2 boardSize)
     {
         size = boardSize;
-        nodes = new(size);
+        Nodes = new(size);
         Clusters = new(size);
-    }
-
-    void PrintNodes(Array2D<Cell> cells, int _x, int _y)
-    {
-        var nodesStr = new StringBuilder($"step({_x}, {_y})\n");
-        for (var x = size.x - 1; x >= 0; x--)
-        {
-            for (var y = 0; y < size.y; y++)
-                nodesStr.Append($"{cells[x, y]}{nodes[x, y]} \t");
-
-            nodesStr.Append("\n");
-        }
-
-        var str = nodesStr.ToString();
-        Debug.Log(str);
     }
 
     int2 GetRoot(Node node)
     {
         while (!node.IsRoot)
-            node = nodes[node.parentGrid.x, node.parentGrid.y];
+            node = Nodes[node.parentGrid.x, node.parentGrid.y];
         return node.grid;
     }
 
     void AddChild(int2 parent, int2 node)
     {
         if (!node.Equals(parent))
-            nodes[node.x, node.y].parentGrid = parent;
+            Nodes[node.x, node.y].parentGrid = parent;
     }
 
-    public void Solve(Array2D<Cell> cells)
+    public void Solve(Array2D<Piece> pieces)
     {
         // clear state
         for (var x = 0; x < size.x; x++)
         for (var y = 0; y < size.y; y++)
         {
-            nodes[x, y] = new(int2(x, y), int2(-1));
+            Nodes[x, y] = new(int2(x, y), int2(-1));
         }
-
-        // bottom-left corner
-        //PrintNodes(cells, 0, 0);
 
         // bottom row
         for (var x = 1; x < size.x; x++)
         {
-            if (cells[x, 0] == cells[x - 1, 0]) AddChild(int2(x, 0), GetRoot(nodes[x - 1, 0]));
+            if (pieces[x, 0] == pieces[x - 1, 0]) AddChild(int2(x, 0), GetRoot(Nodes[x - 1, 0]));
         }
-        //PrintNodes(cells, 1, 0);
 
         // left column
         for (var y = 1; y < size.y; y++)
         {
-            if (cells[0, y] == cells[0, y - 1]) AddChild(int2(0, y), GetRoot(nodes[0, y - 1]));
+            if (pieces[0, y] == pieces[0, y - 1]) AddChild(int2(0, y), GetRoot(Nodes[0, y - 1]));
         }
-        //PrintNodes(cells, 0, 1);
 
         // the rest
         for (var x = 1; x < size.x; x++)
         for (var y = 1; y < size.y; y++)
         {
-            if (cells[x, y] == cells[x - 1, y]) AddChild(int2(x, y), GetRoot(nodes[x - 1, y]));
-            if (cells[x, y] == cells[x, y - 1]) AddChild(int2(x, y), GetRoot(nodes[x, y - 1]));
-
-            //PrintNodes(cells, x, y);
+            if (pieces[x, y] == pieces[x - 1, y]) AddChild(int2(x, y), GetRoot(Nodes[x - 1, y]));
+            if (pieces[x, y] == pieces[x, y - 1]) AddChild(int2(x, y), GetRoot(Nodes[x, y - 1]));
         }
 
         // Bake the linked nodes into groups
         for (var i = 0; i < Clusters.Length; i++)
-            Clusters[i] = (GetRoot(nodes[i]), 0);
+            Clusters[i] = (GetRoot(Nodes[i]), 0);
 
         // Sum the clusters
         foreach (ref var cluster in Clusters)
@@ -144,13 +125,14 @@ public class Board : MonoBehaviour
     [SerializeField] public Sprite[] powerHints;
     [SerializeField] public Sprite[] powerIcons;
 
-    public float gridSize = 1.6f;
+    public float cellSize = 1.6f;
 
-    [HideInInspector][SerializeField] Transform _T;
-    [HideInInspector][SerializeField] Camera _Cam;
-    [HideInInspector][SerializeField] BackBoard backBoard;
+    [SerializeField, HideInInspector] Transform _T;
+    [SerializeField, HideInInspector] Camera _Cam;
+    [SerializeField, HideInInspector] BackBoard backBoard;
     Random random = new(1235);
-    [NonSerialized] public Array2D<Cell> Cells;
+
+    [NonSerialized] public Array2D<Piece> Pieces;
     [NonSerialized] public Array2D<Transform> Transforms;
     [NonSerialized] public Array2D<SpriteRenderer> Icons;
     [NonSerialized] public Array2D<SpriteRenderer> Bases;
@@ -158,15 +140,16 @@ public class Board : MonoBehaviour
     // Pooling
     [NonSerialized] Stack<(Transform, SpriteRenderer, SpriteRenderer)> pool;
     (Transform, SpriteRenderer, SpriteRenderer) GetFromPool() => pool.Pop();
-    void ReturnToPool(int2 grid) => pool.Push((Transforms[grid], Icons[grid], Bases[grid]));
-    void ReturnToPool(int x) => pool.Push((Transforms[x], Icons[x], Bases[x]));
+    void ReturnToPool(int2 grid) => pool.Push((Transforms[grid], Bases[grid], Icons[grid]));
+    void ReturnToPool(int x) => pool.Push((Transforms[x], Bases[x], Icons[x]));
 
     // Space transforms
     public float2 World2Local(float2 worldPos) => worldPos - float3(_T.position).xy;
-    public int2 World2Grid(float2 worldPos) => int2(round(World2Local(worldPos) / gridSize));
+    public int2 World2Grid(float2 worldPos) => int2(round(World2Local(worldPos) / cellSize));
 
     public float2 Local2World(float2 localPos) => float3(_T.position).xy + localPos;
-    public float2 Grid2World(int2 gridPos) => Local2World(float2(gridPos) * gridSize);
+    public float2 Grid2World(int2 gridPos) => Local2World(float2(gridPos) * cellSize);
+    public float2 Idx2World(int idx) => Grid2World(Array2DUtility.Idx2Grid(idx, level.size.y));
 
     void OnValidate() // not Awake because custom inspector use the space transform methods that require _T
     {
@@ -177,33 +160,24 @@ public class Board : MonoBehaviour
 
     void Start()
     {
-        Cells = new(level.size);
+        Pieces = new(level.size);
         Transforms = new(level.size);
         Icons = new(level.size);
         Bases = new(level.size);
 
         pool = new(level.size.x * level.size.y);
-
-        float3 pos = _T.position;
+        for (var i = 0; i < Transforms.Length; i++)
+        {
+            var blockTransform = Transforms[i] = Instantiate(blockPrefab, _T).transform;
+            Icons[i] = blockTransform.Find("icon").GetComponent<SpriteRenderer>();
+            Bases[i] = blockTransform.Find("base").GetComponent<SpriteRenderer>();
+            ReturnToPool(i);
+        }
 
         for (var x = 0; x < level.size.x; x++)
         for (var y = 0; y < level.size.y; y++)
         {
-            var cell = Cells[x, y] = RandomBlock();
-
-            var blockTransform = Transforms[x, y] = Instantiate(
-                blockPrefab,
-                pos + float3(gridSize * float2(x, y), 0),
-                Quaternion.identity,
-                _T
-            ).transform;
-            var icon = Icons[x, y] = blockTransform.Find("icon").GetComponent<SpriteRenderer>();
-            var block = Bases[x, y] = blockTransform.Find("block").GetComponent<SpriteRenderer>();
-
-            var color = level.colors[cell.SubType];
-            block.color = color;
-            icon.color = Color.Lerp(color, Color.black, 0.1f);
-            icon.sprite = level.icons[cell.SubType];
+            CreateBlock(int2(x, y));
         }
 
         clusterSolver = new ClusterSolver(level.size);
@@ -227,29 +201,27 @@ public class Board : MonoBehaviour
 
         if (IsMouseChanged)
         {
-            if (MousePrevious.isIn)
-                Transforms[MousePrevious.grid].localScale = float3(1f);
-
-            if (MouseCurrent.isIn)
-                Transforms[MouseCurrent.grid].localScale = float3(1.2f);
+            if (MousePrevious.isIn) Transforms[MousePrevious.grid].localScale = float3(1f);
+            if (MouseCurrent.isIn) Transforms[MouseCurrent.grid].localScale = float3(1.2f);
         }
 
         if (Input.GetMouseButtonDown(0) && MouseCurrent.isIn)
             MouseDownGrid = MouseCurrent.grid;
 
-        if (Input.GetMouseButtonUp(0) && MouseCurrent.grid.Equals(MouseDownGrid) && Cells[MouseCurrent.grid].Type != ItemType.Empty)
+        if (Input.GetMouseButtonUp(0) && MouseCurrent.grid.Equals(MouseDownGrid) &&
+            Pieces[MouseCurrent.grid].type != Piece.Type.Empty)
         {
-            Debug.Log($"MouseAction on grid: {MouseCurrent.grid} {Cells[MouseCurrent.grid]}");
-            
-            if (Cells[MouseCurrent.grid] is { Type: ItemType.Block, SubType: var subType })
-                backBoard.React(level.colors[subType]);
+            Debug.Log($"MouseAction on grid: {MouseCurrent.grid} {Pieces[MouseCurrent.grid]}");
+
+            if (Pieces[MouseCurrent.grid] is { type: Piece.Type.Block, variant: var subType })
+                backBoard.React(level.blockTypes[subType].blockColor);
 
             // Remove the cluster
             var cluster = clusterSolver.Clusters[MouseCurrent.grid];
             for (var i = 0; i < clusterSolver.Clusters.Length; i++)
                 if (clusterSolver.Clusters[i].group.Equals(cluster.group))
                 {
-                    Cells[i].Type = ItemType.Empty;
+                    Pieces[i].type = Piece.Type.Empty;
                     Transforms[i].gameObject.SetActive(false);
                     ReturnToPool(i);
                 }
@@ -266,15 +238,15 @@ public class Board : MonoBehaviour
                 var gap = 0;
                 for (var y = 0; y < level.size.y; y++)
                 {
-                    if (Cells[x, y].Type == ItemType.Empty)
+                    if (Pieces[x, y].type == Piece.Type.Empty)
                     {
                         gap++;
                     }
                     else if (gap > 0)
                     {
-                        Transforms[x, y].Translate(0, -1 * gap * gridSize, 0);
+                        Transforms[x, y].Translate(0, -1 * gap * cellSize, 0);
                         Transforms[x, y - gap] = Transforms[x, y];
-                        Cells[x, y - gap] = Cells[x, y];
+                        Pieces[x, y - gap] = Pieces[x, y];
                         Icons[x, y - gap] = Icons[x, y];
                         Bases[x, y - gap] = Bases[x, y];
                     }
@@ -293,47 +265,55 @@ public class Board : MonoBehaviour
 
     void CreatePower(int2 grid, int powerLevel)
     {
-        Cells[MouseCurrent.grid] = powerLevel switch
+        Pieces[MouseCurrent.grid] = powerLevel switch
         {
-            0 => new(ItemType.Triangle, default),
-            1 => new(ItemType.ExplosI, random.NextInt(0, 2)),
-            2 => new(ItemType.ExplosO, default),
-            3 => new(ItemType.Star, default),
+            0 => new(Piece.Type.Triangle, default),
+            1 => new(Piece.Type.ExplosI, random.NextInt(0, 2)),
+            2 => new(Piece.Type.ExplosO, default),
+            3 => new(Piece.Type.Star, default),
         };
+        var (t, b, i) = (Transforms[grid], Bases[grid], Icons[grid]) = GetFromPool();
 
-        var (t, i, b) = (Transforms[grid], Icons[grid], Bases[grid]) = GetFromPool();
         t.gameObject.SetActive(true);
         t.position = float3(Grid2World(MouseCurrent.grid), 0);
-        i.sprite = powerIcons[powerLevel];
-        b.enabled = false;
-    }
+        t.localScale = float3(1);
 
-    Cell RandomBlock() => new(ItemType.Block, random.NextInt(level.colors.Count));
+        b.enabled = true;
+        b.sprite = powerIcons[powerLevel];
+        b.color = Color.white;
+
+        i.enabled = false;
+    }
 
     void CreateBlock(int2 grid)
     {
-        var (t, i, b) = (Transforms[grid], Icons[grid], Bases[grid]) = GetFromPool();
+        var piece = Pieces[grid] = new(Piece.Type.Block, random.NextInt(level.blockTypes.Length));
+        var blockType = level.blockTypes[piece.variant];
+        var (t, b, i) = (Transforms[grid], Bases[grid], Icons[grid]) = GetFromPool();
+
         t.gameObject.SetActive(true);
         t.position = float3(Grid2World(int2(grid)), 0);
+        t.localScale = float3(1);
 
-        var cell = Cells[grid] = RandomBlock();
-        var color = level.colors[cell.SubType];
-        b.color = color;
         b.enabled = true;
-        i.color = Color.Lerp(color, Color.black, 0.1f); // TODO(bekorn): precompute in level
-        i.sprite = level.icons[cell.SubType];
+        b.sprite = level.block;
+        b.color = blockType.blockColor.color;
+
+        i.enabled = true;
+        i.sprite = blockType.icon;
+        i.color = blockType.blockColor.Darker;
     }
 
     void UpdateGroups()
     {
-        clusterSolver.Solve(Cells);
+        clusterSolver.Solve(Pieces);
 
         // Set blocks' power hints
-        for (var i = 0; i < Cells.Length; i++)
-            if (Cells[i].Type == ItemType.Block)
+        for (var i = 0; i < Pieces.Length; i++)
+            if (Pieces[i] is { type: Piece.Type.Block, variant: var variant })
                 Icons[i].sprite = (clusterSolver.Clusters[i].size / 3) switch // TODO(bekorn): rules
                 {
-                    0 => level.icons[Cells[i].SubType],
+                    0 => level.blockTypes[variant].icon,
                     var powerType => powerHints[clamp(powerType - 1, 0, powerHints.Length - 1)], // TODO(bekorn): rules
                 };
     }

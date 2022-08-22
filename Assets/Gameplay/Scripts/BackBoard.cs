@@ -7,8 +7,8 @@ namespace Gameplay.Scripts
 public class BackBoard : MonoBehaviour
 {
     LineRenderer border;
-    MeshRenderer backCells;
-    Material backCellMat, borderMat;
+    MeshRenderer cells;
+    Material cellMat, borderMat;
 
     static readonly int _Thickness = Shader.PropertyToID("_Thickness");
     static readonly int _Constrain = Shader.PropertyToID("_Constrain");
@@ -40,21 +40,23 @@ public class BackBoard : MonoBehaviour
         borderMat.SetFloat(_Thickness, current.thickness);
         borderMat.SetFloat(_Constrain, current.constrain);
         borderMat.SetColor(_Color, current.color);
-        backCellMat.SetColor(_Color, current.color);
+        cellMat.SetColor(_Color, current.color);
     }
 
     void Start()
     {
         var board = transform.parent.GetComponent<Board>();
-        transform.localScale *= board.gridSize;
-        transform.Translate(-0.5f * board.gridSize, -0.5f * board.gridSize, 0);
+        transform.localScale *= board.cellSize;
+        transform.Translate(-0.5f * board.cellSize, -0.5f * board.cellSize, 0);
 
         var level = board.level;
 
-        // configure backCells
+        // configure cells
         {
-            backCells = GetComponent<MeshRenderer>();
-            backCellMat = backCells.sharedMaterial;
+            cells = GetComponent<MeshRenderer>();
+            cellMat = cells.material;
+            cellMat.SetTexture("_Texture2D", level.cell.texture);
+            var cellUVs = level.cell.uv; // corner order is: tl, tr, bl, br
 
             var mesh = GetComponent<MeshFilter>().mesh = new Mesh();
             var quadCount = level.size.x * level.size.y;
@@ -74,10 +76,10 @@ public class BackBoard : MonoBehaviour
                 verts[baseVert + 3] = new Vector3(x + 0, y + 1);
 
                 var baseUV = baseIdx * 4;
-                uvs[baseUV + 0] = new Vector2(0, 0);
-                uvs[baseUV + 1] = new Vector2(1, 0);
-                uvs[baseUV + 2] = new Vector2(1, 1);
-                uvs[baseUV + 3] = new Vector2(0, 1);
+                uvs[baseUV + 0] = cellUVs[2];
+                uvs[baseUV + 1] = cellUVs[3];
+                uvs[baseUV + 2] = cellUVs[1];
+                uvs[baseUV + 3] = cellUVs[0];
 
                 var baseIndex = baseIdx * 6;
                 indices[baseIndex + 0] = baseVert + 0;
@@ -108,7 +110,7 @@ public class BackBoard : MonoBehaviour
             };
             border.SetPositions(corners);
 
-            borderMat = border.sharedMaterial;
+            borderMat = border.material;
             borderMat.SetFloat(
                 "BorderLength",
                 Vector3.Distance(corners[0], corners[1]) + Vector3.Distance(corners[1], corners[2]) +

@@ -37,4 +37,9 @@ public readonly struct Array2D<T>
         public ref T Current => ref array[idx];
     }
 }
+
+public static class Array2DUtility
+{
+    public static int2 Idx2Grid(int idx, int height) => new(idx / height, idx % height);
+}
 }
